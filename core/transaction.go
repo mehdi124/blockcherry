@@ -1,11 +1,38 @@
 package core
 
-import "io"
+import (
+	"fmt"
+
+	"github.com/mehdi124/blockcherry/crypto"
+)
 
 type Transaction struct {
-	Data []byte
+	Data      []byte
+	PublicKey crypto.PublicKey
+	Signature *crypto.Signature
 }
 
-func (tx *Transaction) DecodeBinary(r io.Reader) error { return nil }
+func (tx *Transaction) Sign(privKey crypto.PrivateKey) error {
 
-func (tx *Transaction) EncodeBinary(w io.Writer) error { return nil }
+	sig, err := privKey.Sign(tx.Data)
+	if err != nil {
+		return err
+	}
+
+	tx.PublicKey = privKey.PublicKey()
+	tx.Signature = sig
+	return nil
+}
+
+func (tx *Transaction) Verify() error {
+
+	if tx.Signature == nil {
+		return fmt.Errorf("transaction has no signature")
+	}
+
+	if !tx.Signature.Verify(tx.PublicKey, tx.Data) {
+		return fmt.Errorf("invalid transaction signature")
+	}
+
+	return nil
+}

@@ -1,71 +1,56 @@
 package core
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/mehdi124/blockcherry/crypto"
 	"github.com/mehdi124/blockcherry/types"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestHeader_Encode_Decode(t *testing.T) {
+func randomBlock(height uint32) *Block {
 
-	h := &Header{
-		Version:   1,
-		PrevBlock: types.RandomHash(),
-		Timestamp: time.Now().UnixNano(),
-		Height:    10,
-		Nonce:     983245,
+	header := &Header{
+		Version:       1,
+		PrevBlockHash: types.RandomHash(),
+		Height:        height,
+		Timestamp:     time.Now().UnixNano(),
 	}
 
-	buf := &bytes.Buffer{}
-	assert.Nil(t, h.EncodeBinary(buf))
+	tx := Transaction{
+		Data: []byte("foo"),
+	}
 
-	//	hDecode := &Header{}
-	assert.Nil(t, h.DecodeBinary(buf))
-	//	assert.Equal(t, h, hDecode)
+	return NewBlock(header, []Transaction{tx})
 
 }
 
-func TestBlock_Encode_Decode(t *testing.T) {
-
-	b := &Block{
-		Header: Header{
-			Version:   1,
-			PrevBlock: types.RandomHash(),
-			Timestamp: time.Now().UnixNano(),
-			Height:    10,
-			Nonce:     983245,
-		},
-		Transactions: nil,
-	}
-
-	buf := &bytes.Buffer{}
-	assert.Nil(t, b.EncodeBinary(buf))
-
-	bDecode := &Block{}
-	assert.Nil(t, bDecode.DecodeBinary(buf))
-	assert.Equal(t, b, bDecode)
-
+func TestHashBlock(t *testing.T) {
+	b := randomBlock(0)
+	fmt.Println(b.Hash(BlockHasher{}))
 }
 
-func TestBlockHash(t *testing.T) {
+func TestSignBlock(t *testing.T) {
+	privKey := crypto.GeneratePrivateKey()
+	b := randomBlock(0)
 
-	b := &Block{
-		Header: Header{
-			Version:   1,
-			PrevBlock: types.RandomHash(),
-			Timestamp: time.Now().UnixNano(),
-			Height:    10,
-			Nonce:     983245,
-		},
-		Transactions: []Transaction{},
-	}
+	assert.Nil(t, b.Sign(privKey))
+	assert.NotNil(t, b.Signature)
+}
 
-	h := b.Hash()
-	fmt.Println("block hash", h)
-	assert.False(t, h.IsZero())
+func TestVerifyBlock(t *testing.T) {
+	privKey := crypto.GeneratePrivateKey()
+	b := randomBlock(0)
 
+	assert.Nil(t, b.Sign(privKey))
+	assert.Nil(t, b.Verify())
+
+	other := crypto.GeneratePrivateKey()
+	b.Validator = other.PublicKey()
+	assert.NotNil(t, b.Verify())
+
+	b.Height = 100
+	assert.NotNil(t, b.Verify())
 }
