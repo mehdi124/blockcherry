@@ -13,7 +13,7 @@ type Hasher[T any] interface {
 type BlockHasher struct {
 }
 
-func (BlockHasher) Hash(b *Block) types.Hash {
-	h := sha256.Sum256(b.HeaderData())
+func (BlockHasher) Hash(header *Header) types.Hash {
+	h := sha256.Sum256(header.Bytes())
 	return types.Hash(h)
 }
