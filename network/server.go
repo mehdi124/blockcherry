@@ -2,11 +2,11 @@ package network
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"time"
 
 	"github.com/mehdi124/blockcherry/crypto"
+	"github.com/mehdi124/blockcherry/types"
 
 	"github.com/go-kit/log"
 	"github.com/mehdi124/blockcherry/core"
@@ -27,12 +27,13 @@ type ServerOpts struct {
 type Server struct {
 	ServerOpts
 	memPool     *TxPool
+	chain       *core.Blockchain
 	isValidator bool
 	rpcCh       chan RPC
 	quitCh      chan struct{}
 }
 
-func NewServer(opts ServerOpts) *Server {
+func NewServer(opts ServerOpts) (*Server, error) {
 
 	if opts.BlockTime == time.Duration(0) {
 		opts.BlockTime = defaultBlockTime
@@ -47,9 +48,16 @@ func NewServer(opts ServerOpts) *Server {
 		opts.Logger = log.With(opts.Logger, "ID", opts.ID)
 	}
 
+	block := genesisBlock()
+	chain, err := core.NewBlockchain(block)
+	if err != nil {
+		return nil, err
+	}
+
 	s := &Server{
 		memPool:     NewTxPool(),
 		ServerOpts:  opts,
+		chain:       chain,
 		isValidator: opts.PrivateKey != nil,
 		rpcCh:       make(chan RPC),
 		quitCh:      make(chan struct{}, 1),
@@ -63,7 +71,7 @@ func NewServer(opts ServerOpts) *Server {
 		go s.validatorLoop()
 	}
 
-	return s
+	return s, nil
 }
 
 func (s *Server) Start() {
@@ -160,7 +168,25 @@ func (s *Server) broadcastTx(tx *core.Transaction) error {
 }
 
 func (s *Server) createNewBlock() error {
-	fmt.Println("creating new block")
+
+	currentHeader, err := s.chain.GetHeader(s.chain.Height())
+	if err != nil {
+		return err
+	}
+
+	block, err := core.NewBlockFromPrevHeader(currentHeader, nil)
+	if err != nil {
+		return err
+	}
+
+	if err := block.Sign(*s.PrivateKey); err != nil {
+		return err
+	}
+
+	if err := s.chain.AddBlock(block); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -174,4 +200,20 @@ func (s *Server) initTransport() {
 		}(tr)
 	}
 
+}
+
+func genesisBlock() *core.Block {
+	header := &core.Header{
+		Version:   1,
+		DataHash:  types.Hash{},
+		Height:    0,
+		Timestamp: time.Now().UnixNano(),
+	}
+
+	block, err := core.NewBlock(header, nil)
+	if err != nil {
+		return nil
+	}
+
+	return block
 }
