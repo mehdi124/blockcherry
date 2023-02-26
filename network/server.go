@@ -2,17 +2,21 @@ package network
 
 import (
 	"bytes"
-	"crypto"
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/mehdi124/blockcherry/crypto"
+
+	"github.com/go-kit/log"
 	"github.com/mehdi124/blockcherry/core"
-	"github.com/sirupsen/logrus"
 )
 
 var defaultBlockTime = 5 * time.Second
 
 type ServerOpts struct {
+	ID            string
+	Logger        log.Logger
 	RPCDecodeFunc RPCDecodeFunc
 	RPCProcessor  RPCProcessor
 	Transports    []Transport
@@ -38,6 +42,11 @@ func NewServer(opts ServerOpts) *Server {
 		opts.RPCDecodeFunc = DefaultRPCDecodeFunc
 	}
 
+	if opts.Logger == nil {
+		opts.Logger = log.NewLogfmtLogger(os.Stderr)
+		opts.Logger = log.With(opts.Logger, "ID", opts.ID)
+	}
+
 	s := &Server{
 		memPool:     NewTxPool(),
 		ServerOpts:  opts,
@@ -50,7 +59,7 @@ func NewServer(opts ServerOpts) *Server {
 		s.RPCProcessor = s
 	}
 
-	if s.isValidator() {
+	if s.isValidator {
 		go s.validatorLoop()
 	}
 
@@ -67,24 +76,26 @@ free:
 		case rpc := <-s.rpcCh:
 			msg, err := s.RPCDecodeFunc(rpc)
 			if err != nil {
-				logrus.Error(err)
+				s.Logger.Log("error", err)
 			}
 
 			if err := s.RPCProcessor.ProcessMessage(msg); err != nil {
-				logrus.Error(err)
+				s.Logger.Log("error", err)
 			}
 
 		case <-s.quitCh:
 			break free
 		}
-
-		fmt.Println("Server shutdown")
 	}
+
+	s.Logger.Log("msg", "Server is shutting sown")
 }
 
 func (s *Server) validatorLoop() {
 
 	ticker := time.NewTicker(s.BlockTime)
+
+	s.Logger.Log("msg", "Starting validator loop", "blockTime", s.BlockTime)
 
 	for {
 		<-ticker.C
@@ -119,12 +130,6 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 	hash := tx.Hash(core.TxHasher{})
 
 	if s.memPool.Has(hash) {
-
-		logrus.WithFields(logrus.Fields{
-
-			"hash": hash,
-		}).Info("transaction already in mempool")
-
 		return nil
 	}
 
@@ -134,10 +139,9 @@ func (s *Server) processTransaction(tx *core.Transaction) error {
 
 	tx.SetFirstSeen(time.Now().UnixNano())
 
-	logrus.WithFields(logrus.Fields{
-		"hash":           hash,
-		"mempool length": s.memPool.Len(),
-	}).Info("adding new tx to the mempool")
+	s.Logger.Log("msg", "adding new tx to mempool",
+		"hash", hash,
+		"mempoolLen", s.memPool.Len())
 
 	go s.broadcastTx(tx)
 
