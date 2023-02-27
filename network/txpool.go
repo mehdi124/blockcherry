@@ -2,6 +2,7 @@ package network
 
 import (
 	"sort"
+	"sync"
 
 	"github.com/mehdi124/blockcherry/core"
 	"github.com/mehdi124/blockcherry/types"
@@ -39,38 +40,66 @@ func (s *TxMapSorter) Less(i, j int) bool {
 }
 
 type TxPool struct {
-	transactions map[types.Hash]*core.Transaction
+	all     *TxSortedMap
+	pending *TxSortedMap
+
+	maxLength int
 }
 
 func NewTxPool() *TxPool {
 	return &TxPool{
-		transactions: make(map[types.Hash]*core.Transaction),
+		all:       NewSortedMap(),
+		pending:   NewSortedMap(),
+		maxLength: maxLength,
 	}
 }
 
-func (p *TxPool) Transactions() []*core.Transaction {
-	s := NewTxMapSorter(p.transactions)
-	return s.transactions
-}
-
-// Add adds an transaction to the pool,the caller is responsible
-// checking if the tx already exist.
 func (p *TxPool) Add(tx *core.Transaction) error {
-	hash := tx.Hash(core.TxHasher{})
 
-	p.transactions[hash] = tx
-	return nil
+	if p.all.Count() == p.maxLength {
+		oldest := p.all.First()
+		p.all.Remove(oldes.Hash(core.TxHasher{}))
+	}
+
+	if !p.all.Contains(tx.Hash(core.TxHasher{})) {
+		p.all.Add(tx)
+		p.pending.Add(tx)
+	}
 }
 
-func (p *TxPool) Has(hash types.Hash) bool {
-	_, ok := p.transactions[hash]
-	return ok
+func (p *TxPool) Contains(hash types.Hash) bool {
+	return p.all.Contains(hash)
 }
 
-func (p *TxPool) Len() int {
-	return len(p.transactions)
+func (p *TxPool) Pending() []*core.Transaction {
+	return p.pending.txx.Data
 }
 
-func (p *TxPool) Flush() {
-	p.transactions = make(map[types.Hash]*core.Transaction)
+func (p *TxPool) ClearPending() {
+	p.pending.Clear()
+}
+
+func (p *TxPool) PendingCount() int {
+	return p.pending.Count()
+}
+
+type TxSortedMap struct {
+	lock   sync.RWMutex
+	lookup map[types.Hash]*core.Transaction
+	txx    types.List[*core.Transaction]
+}
+
+func NewTxSortedMap() *TxSortedMap {
+	return &TxSortedMap{
+		lookup: make(map[types.Hash]*core.Transaction),
+		txx:    types.NewList[*core.Transaction](),
+	}
+}
+
+func (tx *TxSortedMap) First() *core.Transaction {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	first := t.txx.Get(0)
+	return t.lookup[first.Hash(core.TxHasher{})]
 }
