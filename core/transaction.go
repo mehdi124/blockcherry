@@ -1,26 +1,54 @@
 package core
 
 import (
+	"encoding/gob"
 	"fmt"
+	"math/rand"
 
 	"github.com/mehdi124/blockcherry/crypto"
 	"github.com/mehdi124/blockcherry/types"
 )
 
+type TxType byte
+
+const (
+	TxTypeCollection = iota //0x0
+	TxTypeMint              //0x1
+)
+
+type CollectionTx struct {
+	Fee      uint64
+	MetaData []byte
+}
+
+type MintTx struct {
+	Fee            uint64
+	NFT            types.Hash
+	Collection     types.Hash
+	MetaData       []byte
+	CollectionOwer crypto.PublicKey
+	Signature
+}
+
 type Transaction struct {
+	// Only used for native NFT logic
+	TxInner any
+	// Any arbitrary data for the VM
 	Data      []byte
+	To        crypto.PublicKey
+	Value     uint64
 	From      crypto.PublicKey
 	Signature *crypto.Signature
+	Nonce     int64
+
 	// cached version of tx data hash
 	hash types.Hash
-
-	//first seen is the timestamp of when this tx is first seen locally
-	firstSeen int64
 }
 
 func NewTransaction(data []byte) *Transaction {
 	return &Transaction{
-		Data: data,
+		Data:  data,
+		Nonce: rand.Int63n(1000000000000000),
 	}
 }
 
@@ -37,7 +65,8 @@ func (tx *Transaction) Hash(hasher Hasher[*Transaction]) types.Hash {
 
 func (tx *Transaction) Sign(privKey crypto.PrivateKey) error {
 
-	sig, err := privKey.Sign(tx.Data)
+	hash := tx.Hash(TXHasher{})
+	sig, err := privKey.Sign(hash.ToSlice())
 	if err != nil {
 		return err
 	}
@@ -53,19 +82,13 @@ func (tx *Transaction) Verify() error {
 		return fmt.Errorf("transaction has no signature")
 	}
 
-	if !tx.Signature.Verify(tx.From, tx.Data) {
+	hash := tx.Hash(TXHasher{})
+
+	if !tx.Signature.Verify(tx.From, hash.ToSlice()) {
 		return fmt.Errorf("invalid transaction signature")
 	}
 
 	return nil
-}
-
-func (tx *Transaction) SetFirstSeen(t int64) {
-	tx.firstSeen = t
-}
-
-func (tx *Transaction) FirstSeen() int64 {
-	return tx.firstSeen
 }
 
 func (tx *Transaction) Decode(dec Decoder[*Transaction]) error {
@@ -74,4 +97,9 @@ func (tx *Transaction) Decode(dec Decoder[*Transaction]) error {
 
 func (tx *Transaction) Encode(enc Encoder[*Transaction]) error {
 	return enc.Encode(tx)
+}
+
+func init() {
+	gob.Register(CollectionTx{})
+	gob.Register(MintTx{})
 }
