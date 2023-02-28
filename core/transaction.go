@@ -27,7 +27,7 @@ type MintTx struct {
 	Collection     types.Hash
 	MetaData       []byte
 	CollectionOwer crypto.PublicKey
-	Signature
+	Signature      crypto.Signature
 }
 
 type Transaction struct {
@@ -65,7 +65,7 @@ func (tx *Transaction) Hash(hasher Hasher[*Transaction]) types.Hash {
 
 func (tx *Transaction) Sign(privKey crypto.PrivateKey) error {
 
-	hash := tx.Hash(TXHasher{})
+	hash := tx.Hash(TxHasher{})
 	sig, err := privKey.Sign(hash.ToSlice())
 	if err != nil {
 		return err
@@ -82,7 +82,7 @@ func (tx *Transaction) Verify() error {
 		return fmt.Errorf("transaction has no signature")
 	}
 
-	hash := tx.Hash(TXHasher{})
+	hash := tx.Hash(TxHasher{})
 
 	if !tx.Signature.Verify(tx.From, hash.ToSlice()) {
 		return fmt.Errorf("invalid transaction signature")

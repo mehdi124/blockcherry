@@ -22,10 +22,6 @@ func (BlockHasher) Hash(header *Header) types.Hash {
 
 type TxHasher struct{}
 
-func (TxHasher) Hash(tx *Transaction) types.Hash {
-	return types.Hash(sha256.Sum256(tx.Data))
-}
-
 // Hash will hash the whole bytes of the TX no exception.
 func (TxHasher) Hash(tx *Transaction) types.Hash {
 	buf := new(bytes.Buffer)

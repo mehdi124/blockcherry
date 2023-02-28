@@ -21,7 +21,7 @@ type Blockchain struct {
 	accountState *AccountState
 
 	stateLock       sync.RWMutex
-	collectionState map[types.Hash]*CollectionState
+	collectionState map[types.Hash]*CollectionTx
 	mintState       map[types.Hash]*MintTx
 
 	validator     Validator
@@ -39,7 +39,7 @@ func NewBlockchain(l log.Logger, genesis *Block) (*Blockchain, error) {
 	accountState.CreateAccount(coinbase.Address())
 
 	bc := &Blockchain{
-		contractState:   NewState{},
+		contractState:   NewState(),
 		headers:         []*Header{},
 		store:           NewMemoryStore(),
 		logger:          l,
@@ -106,17 +106,6 @@ func (bc *Blockchain) HasBlock(height uint32) bool {
 	return height <= bc.Height()
 }
 
-func (bc *Blockchain) GetHeader(height uint32) (*Header, error) {
-	if height > bc.Height() {
-		return nil, fmt.Errorf("given height (%d) is too high", height)
-	}
-
-	bc.lock.Lock()
-	defer bc.lock.Unlock()
-
-	return bc.headers[height], nil
-}
-
 // [0,1,2,3] len is 4
 // [0,1,2,3] height is 3
 func (bc *Blockchain) Height() uint32 {
@@ -180,7 +169,7 @@ func (bc *Blockchain) handleTransaction(tx *Transaction) error {
 	if len(tx.Data) > 0 {
 		bc.logger.Log("msg", "executing code", "len", len(tx.Data), "hash", tx.Hash(&TxHasher{}))
 
-		vm := NewVm(tx.Data, bc.contractState)
+		vm := NewVM(tx.Data, bc.contractState)
 		if err := vm.Run(); err != nil {
 			return err
 		}
