@@ -109,7 +109,7 @@ func (b *Block) Decode(dec Decoder[*Block]) error {
 	return dec.Decode(b)
 }
 
-func (b *Block) Encoder(enc Encoder[*Block]) error {
+func (b *Block) Encode(enc Encoder[*Block]) error {
 	return enc.Encode(b)
 }
 
