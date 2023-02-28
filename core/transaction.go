@@ -22,12 +22,12 @@ type CollectionTx struct {
 }
 
 type MintTx struct {
-	Fee            uint64
-	NFT            types.Hash
-	Collection     types.Hash
-	MetaData       []byte
-	CollectionOwer crypto.PublicKey
-	Signature      crypto.Signature
+	Fee             uint64
+	NFT             types.Hash
+	Collection      types.Hash
+	MetaData        []byte
+	CollectionOwner crypto.PublicKey
+	Signature       crypto.Signature
 }
 
 type Transaction struct {

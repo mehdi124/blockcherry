@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/mehdi124/blockcherry/api"
 	"github.com/mehdi124/blockcherry/crypto"
 	"github.com/mehdi124/blockcherry/types"
 
@@ -73,7 +74,7 @@ func NewServer(opts ServerOpts) (*Server, error) {
 	// and the node that will process this message.
 	txChan := make(chan *core.Transaction)
 
-	if len(opts.APIListenAddr > 0) {
+	if len(opts.APIListenAddr) > 0 {
 
 		apiServerCfg := api.ServerConfig{
 			Logger:     opts.Logger,
